@@ -53,6 +53,21 @@ export function mountChrome() {
   document.getElementById('elan-inspector-root').innerHTML = renderInspector()
 
   const bagCount = document.querySelector('[data-bag-count]')
+
+  // The bag badge lives in the shell, but only the Cart element knows the count
+  // — and it is not mounted while the shopper is in Catalog or Account. Without
+  // remembering it, the header would claim an empty bag on every other page.
+  const REMEMBERED = 'elan.shell.bag-count'
+  bagCount.textContent = sessionStorage.getItem(REMEMBERED) ?? '0'
+
+  const setBagCount = (value) => {
+    bagCount.textContent = String(value)
+    try {
+      sessionStorage.setItem(REMEMBERED, String(value))
+    } catch {
+      // Private mode or a full quota: the badge is still correct in-page.
+    }
+  }
   const list = document.querySelector('[data-inspector-list]')
   const panel = document.querySelector('[data-inspector]')
   const counter = document.querySelector('[data-inspector-count]')
@@ -69,9 +84,9 @@ export function mountChrome() {
   onAnyEvent((name, detail) => {
     // The cart badge is the clearest proof that two microfrontends are talking.
     if (name === 'elan:cart-updated' && typeof detail.itemCount === 'number') {
-      bagCount.textContent = String(detail.itemCount)
+      setBagCount(detail.itemCount)
     }
-    if (name === 'elan:order-completed') bagCount.textContent = '0'
+    if (name === 'elan:order-completed') setBagCount(0)
 
     seen += 1
     counter.textContent = String(seen)
