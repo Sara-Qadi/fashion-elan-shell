@@ -1,0 +1,15 @@
+{
+  "name": "elan-shell",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ELAN shell — integrates the three Fashion & Apparel microfrontends via Web Components",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/spa-fallback.mjs",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}
