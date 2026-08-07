@@ -5,21 +5,24 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Publishing by pushing the build to a gh-pages branch, not via
-# actions/deploy-pages. The deployment-API route worked once here and then
-# failed twice in a row with "Timeout reached, aborting!" and no error detail,
-# while GitHub reported Pages as fully operational. A branch push is a plain git
-# operation with nothing in between to time out, and it leaves the published
-# output inspectable in the repository.
+# Publishing through the Pages artifact API rather than a gh-pages branch.
+#
+# Both routes were tried here. The branch push itself always worked, but the
+# legacy Jekyll build that publishes such a branch errored instantly ("Page
+# build failed", duration 0) and then wedged in "building" for ~20 hours, even
+# with .nojekyll present and correct content on the branch. The artifact route
+# is what the sibling Cart repo uses without trouble.
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,18 +38,21 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Publish to gh-pages
-        run: |
-          # Without this, Jekyll skips files and folders beginning with an
-          # underscore, which Vite is free to emit.
-          touch dist/.nojekyll
+      # Pages is enabled on the repository with "GitHub Actions" as the source.
+      # `enablement: true` is deliberately not used: creating the Pages site
+      # needs admin rights that GITHUB_TOKEN does not carry, so it fails the job.
+      - uses: actions/configure-pages@v5
 
-          cd dist
-          git init -q
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -qm "Deploy ${GITHUB_SHA::7}"
-          git push -q --force \
-            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" \
-            HEAD:gh-pages
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
