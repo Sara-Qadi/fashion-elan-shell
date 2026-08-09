@@ -239,11 +239,17 @@ export function startRouter() {
       else history.pushState({}, '', url)
     }
 
-    // Staying inside the same app still means telling it where it now is.
-    // Account does not move itself while embedded — it asks, and waits for the
-    // shell to answer by setting `route`. Without this its internal links do
-    // nothing but change the address bar.
-    setRoute(current.element, path)
+    // Some apps ask the shell to navigate and then wait to be told where they
+    // are; others move themselves and report afterwards. Only the first kind
+    // may be echoed back to.
+    //
+    // Echoing at the wrong app is not harmless. The Cart element has already
+    // navigated by the time it reports, so setting `route` again starts a
+    // second navigation that cancels the first — and Vue Router leaves
+    // <router-view> empty when its in-flight navigation is superseded. That is
+    // what a deep link to /checkout/shipping with no shipping data on file
+    // rendered: a correct URL, a mounted app, and a blank page.
+    if (speaker?.awaitsRouteEcho) setRoute(current.element, path)
   })
 
   // Cart's "Continue Shopping". preventDefault() tells it the shell took over.

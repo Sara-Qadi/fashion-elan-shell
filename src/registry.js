@@ -94,6 +94,11 @@ export const MICROFRONTENDS = [
     // which is emitted on the Cart's confirmation route, not on one of hers.
     listensWhileHidden: true,
 
+    // Alone among the three, this app does not move itself while embedded: it
+    // emits `elan:navigate` and then waits for the shell to set `route`. Its
+    // own sidebar links do nothing until the shell answers.
+    awaitsRouteEcho: true,
+
     owns: [
       '/account',
       '/login',
