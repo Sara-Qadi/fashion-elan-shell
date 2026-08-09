@@ -10,123 +10,146 @@
 
 ## Context
 
-Our group integrates three separately-deployed microfrontends into one shell app
-using **Web Components**. The shell loads each app's bundle from its **live
-deployment URL** and mounts it as a custom element.
+Your element is the most complete of the three. `<elan-account-app>` registers
+from `/mfe/elan-account.js`, takes a reflected `route` property, works out that
+it is embedded from that property, refuses to touch `history` while embedded,
+emits `elan:navigate` and lets it escape the shadow root. All of that is
+verified working inside the shell.
 
-- Shell repo: https://github.com/Sara-Qadi/fashion-elan-shell
-- Cart app (Vue): `<elan-cart-app>` — done
-- Catalog app (React): `<elan-catalog-app>` — in progress
+Your shell PR is merged too. The shell kept `preventDefault()` on cancelable
+`elan:navigate`, `detail.replace`, setting `route` as both property and
+attribute, `/reviews` in your owned routes, and `elan:order-history-updated` in
+the watched events.
 
-**Your app is already the furthest along.** `<elan-account-app>` is registered
-and is the root of your page, with an open shadow root, and it already exposes
-`handleLocationChange`, `handleNavigationRequest`, `handleUserLoggedIn` and
-`handleUserLoggedOut`. Two things are still missing.
+Shell repo: https://github.com/Sara-Qadi/fashion-elan-shell
+Live shell: https://sara-qadi.github.io/fashion-elan-shell/
 
-## What to change
+Two things left.
 
-### 1. Publish a stable, unhashed bundle URL  ← the blocking one
+---
 
-Right now your only entry is `/assets/index-gGpSDwtQ.js`. That hash changes on
-every deploy, so the shell cannot hardcode it. Add a second build target that
-emits **one self-contained file** at:
+## 1. The 17MB stylesheet ← the one worth fixing
 
-```
-https://fashion-elan-account-orders.vercel.app/elan-account-app.js
-```
+`/mfe/elan-account.css` is **17MB** (12.8MB even gzipped). It is almost entirely
+one line — `import 'material-symbols'` — because that package ships its webfont
+base64-inlined inside the CSS, and `assetsInlineLimit: 0` does not undo an
+inline that the source file already contains.
 
-Loading it must register `<elan-account-app>` as a side effect. Nothing else.
+Your registry entry in the shell listed it as `styles`, and the shell would have
+downloaded it on every page load. **It does not load it any more.** Instead the
+shell declares the one thing that genuinely cannot live inside a shadow root:
 
-Vite hints:
-
-- separate `vite.element.config.js` using `build.lib`
-- `fileName: () => 'elan-account-app.js'`, `formats: ['es']`
-- `rollupOptions.output.inlineDynamicImports: true` — the shell loads this
-  cross-origin and cannot resolve your relative chunk URLs
-- `define: { 'process.env.NODE_ENV': '"production"' }` — library mode skips the
-  replacement, and the bundle otherwise throws `process is not defined`
-- watch the size: **Vite base64-inlines every asset in library mode**, so a
-  bundled icon font can balloon the file (ours hit 7MB before we moved the font
-  to a CDN)
-- add it to `npm run build` and copy into `dist/` so Vercel publishes it
-
-*(Until this exists, the shell falls back to reading your `index.html` and
-pulling the hashed script out of it. That works today, but it re-downloads your
-HTML on every load and breaks the moment Vercel changes anything — please do not
-rely on it.)*
-
-### 2. Accept a `route` property from the shell
-
-**Observed when running your live element inside the shell:** the shell mounted
-you at `/account`, and your route guard immediately rewrote the address bar to
-`/login` by writing history directly. Your `currentRoute` stayed `/login` even
-after the shell pushed `/orders`.
-
-It happens to survive today only because the shell also routes `/login` to you.
-The moment a guard redirect lands on a path the shell gives to Catalog or Cart,
-the shell and your element will disagree about what is on screen.
-
-`observedAttributes` is currently `[]`, so there is no way for the shell to tell
-you where you are. That is the change:
-
-The shell owns the URL; your element must not read `location` or call
-`history.pushState` while embedded. You already have `handleLocationChange`, so
-this should be small:
-
-- expose a **`route` property/attribute** (a path string like `/account/orders`)
-- render according to it, and re-render when it changes
-- when the user navigates inside your app, emit `elan:navigate` with
-  `{ source: 'elan-account', path }` instead of pushing history
-
-Routes the shell sends you:
-
-```
-/account   /account/*   /login   /register   /orders   /wishlist   /profile
+```html
+<link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
 ```
 
-Unrecognised path → render your dashboard rather than throwing.
+That is about a kilobyte, and your icons render correctly with it, because
+`<md-icon>` carries `font-family: 'Material Symbols Outlined'` in its own shadow
+styles and only needs the `@font-face` at document level.
 
-## Event contract (mostly already correct)
+**In your repo**, the equivalent fix is to stop bundling the font:
 
-Keep `bubbles: true` and `composed: true` — **composed matters for you** more
-than anyone, because your element has a shadow root and events would otherwise
-not escape it.
-
-Your existing events are unchanged: `elan:user-logged-in`,
-`elan:user-registered`, `elan:user-logged-out`, `elan:profile-updated`,
-`elan:wishlist-item-removed`, `elan:wishlist-updated`, `elan:add-to-cart`,
-`elan:review-submitted`, `elan:navigate`.
-
-### ⚠️ One expectation needs adjusting
-
-Your contract says you expect `elan:order-completed` with `{ order }`.
-
-The Cart app emits it **flat and deliberately minimal**:
-
-```js
-{ source: 'elan-cart-checkout', orderId, total, itemCount, currency, placedAt }
+```ts
+// src/mfe.ts — drop this line
+import 'material-symbols';
 ```
 
-There is **no** shipping address, no email, no payment field, and this will not
-change — the card number and CVV never leave the checkout form at all, and the
-order event was designed so no customer data can leak through it.
+and instead add the Google Fonts `<link>` to your standalone `index.html`. Your
+`dist/mfe/elan-account.css` then drops to a few KB, and the shell can go back to
+loading it normally (tell Sara and she will set `styles` in the registry again).
 
-So order history cannot be built from the event payload alone. Pick one:
+`src/styles/document.css` is the other thing in that file. The shell already
+owns document background, margins and font — so nothing is lost by skipping it
+while embedded.
 
-- **(a)** store what you need at add-to-cart / checkout-started time and use
-  `orderId` from the event to close the record — *recommended, no coordination*
-- **(b)** read the Cart app's `localStorage` key `elan.checkout.last-order.v1`,
-  which holds the full order snapshot. Same browser only, and it couples you to
-  someone else's storage key
-- **(c)** ask the Cart app to expose a `getOrder(orderId)` method on its element
+---
+
+## 2. Guest checkout orders are dropped
+
+This one is a design decision, not a bug — flagging it so the team picks
+deliberately before the demo.
+
+`importCompletedOrder()` calls `orderService.getOrderById()`, which calls
+`getAuthenticatedUserId()`, which throws when nobody is signed in:
+
+```
+[ELAN Account] Unable to import the completed order.
+OrderError: You must be signed in to access orders.
+```
+
+So an order placed **before** signing in never reaches order history, and
+signing in afterwards does not recover it — the shared snapshot is still sitting
+in localStorage unread.
+
+Three options:
+
+- **(a)** Demo signed-in. Sign in first, then shop. Nothing to build; just make
+  sure whoever demos knows the order matters.
+- **(b)** Import on sign-in. On `USER_LOGGED_IN`, sweep
+  `elan:shared-orders:v1` for snapshots not yet in this user's history and
+  import them. Roughly ten lines, and it makes the guest→sign-in path work.
+- **(c)** Allow guest orders against a placeholder user id.
+
+**(b)** is the recommended one.
+
+---
+
+## The shared order store — now written, please do not change the shape
+
+You read completed orders from `localStorage['elan:shared-orders:v1']`, matching
+the `orderId` on `elan:order-completed`. **Nothing was writing that store**, so
+every order failed with `ORDER_SNAPSHOT_NOT_FOUND` and history stayed empty.
+
+The Cart app now writes it, immediately before emitting the event, in exactly
+the shape `src/models/shared-order.model.ts` defines:
+
+```json
+{
+  "version": 1,
+  "orders": [
+    {
+      "orderId": "ELN-2026-157258",
+      "status": "processing",
+      "paymentStatus": "paid",
+      "products": [
+        { "productId": "…", "name": "…", "imageUrl": "…",
+          "unitPrice": 189, "quantity": 1,
+          "selectedColor": "Rust", "selectedSize": "M" }
+      ],
+      "shippingAddress": {
+        "recipientName": "…", "phone": "…", "country": "…",
+        "city": "…", "street": "…", "building": "…", "postalCode": "…"
+      },
+      "pricing": { "subtotal": 433, "shipping": 0, "discount": 0,
+                   "tax": 21.65, "total": 454.65, "currency": "USD" },
+      "placedAt": "2026-08-09T13:40:50.682Z",
+      "estimatedDeliveryDate": "2026-08-14T…"
+    }
+  ]
+}
+```
+
+Verified against your validators: totals match the event to within a cent, item
+count matches the sum of quantities, currency matches, `imageUrl` is never empty
+(a placeholder tile is substituted when the Catalog app does not send one), and
+the store keeps the 20 most recent orders.
+
+Two notes on why it is split this way:
+
+- **The event stays minimal on purpose.** `elan:order-completed` carries only
+  `orderId`, `total`, `itemCount`, `currency`, `placedAt` and `source`. No
+  address, no email, no payment field — customer data must not travel on the
+  event bus where any script on the page can listen for it. The detail goes to
+  same-origin storage and you look it up by id, which is what you already do.
+- **There is no payment data in the snapshot at all**, and there never will be.
+  The card number and CVV never leave the checkout form's component state.
+
+---
 
 ## Definition of done
 
-- [ ] `https://fashion-elan-account-orders.vercel.app/elan-account-app.js` returns **200** with content-type `application/javascript`
-- [ ] Loading it in a blank page registers `<elan-account-app>`
-- [ ] `<elan-account-app route="/orders"></elan-account-app>` renders order history
-- [ ] Changing the `route` property re-renders without a reload
-- [ ] Internal navigation emits `elan:navigate` with `{ path }`
-- [ ] Order history works from `orderId` alone (option a, b or c above)
+- [ ] `dist/mfe/elan-account.css` is under ~100KB (font moved to a CDN link)
+- [ ] Icons still render in both the standalone app and the shell
+- [ ] A decision made on guest orders — (a), (b) or (c) above
 - [ ] The standalone app at the root URL still works unchanged
-- [ ] Nothing in the element calls `history.pushState` or reads `location`
