@@ -12,7 +12,7 @@ import { loadMicrofrontend } from './loader.js'
 import { appBySource, MICROFRONTENDS, resolveApp } from './registry.js'
 
 const outlet = () => document.getElementById('elan-outlet')
-const statusNode = () => document.getElementById('elan-status')
+const statusNode = () => document.getElementById('elan-shell-status')
 
 /**
  * Mounted elements, by app id. Nothing is ever removed from here.
@@ -29,7 +29,7 @@ const mounted = new Map()
 let current = { id: null, element: null }
 
 function setStatus(html, tone = 'info') {
-  statusNode().innerHTML = html ? `<div class="elan-status elan-status--${tone}">${html}</div>` : ''
+  statusNode().innerHTML = html ? `<div class="elan-shell-status elan-shell-status--${tone}">${html}</div>` : ''
 }
 
 function failureMessage(app, error) {
@@ -39,7 +39,7 @@ function failureMessage(app, error) {
       The shell asked <code>${app.origin}${app.bundle}</code> for
       <code>&lt;${app.tag}&gt;</code> and could not get it.
     </p>
-    <p class="elan-status__detail">${String(error.message ?? error)}</p>
+    <p class="elan-shell-status__detail">${String(error.message ?? error)}</p>
     <p>
       This is expected until ${app.owner} publishes the element build.
       The instructions are in <code>docs/</code> of the shell repo, and the other
@@ -60,6 +60,22 @@ function setRoute(element, pathname) {
   if (!element) return
   element.route = pathname
   element.setAttribute('route', pathname)
+}
+
+/**
+ * The same, but never inside the caller's current render pass.
+ *
+ * A microfrontend can ask to navigate from within its own update cycle —
+ * Account's auth guard runs in Lit's `willUpdate` — and the shell answers
+ * synchronously. Writing `route` at that moment lands in a window where Lit has
+ * already taken its list of changed properties, so the new value is rendered
+ * with but never re-read: the element ends up displaying the page it was
+ * redirecting *away* from, while `route` says otherwise. A macrotask puts the
+ * answer safely after the update has finished.
+ */
+function setRouteSoon(element, pathname) {
+  if (!element) return
+  setTimeout(() => setRoute(element, pathname), 0)
 }
 
 /**
@@ -105,7 +121,7 @@ async function mount(app, pathname) {
   }
 
   if (!mounted.has(app.id)) {
-    setStatus(`<p class="elan-status__loading">Loading ${app.label}…</p>`, 'loading')
+    setStatus(`<p class="elan-shell-status__loading">Loading ${app.label}…</p>`, 'loading')
   }
 
   let element
@@ -214,12 +230,21 @@ export function startRouter() {
     const path = event.detail?.path
     if (typeof path !== 'string' || !path.trim()) return
 
-    // Only the microfrontend on screen may move the shopper. The others are
-    // still mounted and still routing internally — Account's auth guard asks
-    // for /login the moment it loads — and a hidden app must not be able to
-    // navigate the page away from whatever the shopper is actually looking at.
+    // Only the microfrontend on screen may move the shopper — a hidden app must
+    // not navigate the page away from what is actually being looked at.
+    //
+    // But a hidden app may still move *itself*, and must be allowed to. Account
+    // is preloaded so it can hear `elan:order-completed`, and its auth guard
+    // asks for /login the moment it loads. Dropping that request left it
+    // rendering a signed-out profile page; then, because the shell later showed
+    // it at /account — the same value it was preloaded with — its `route` never
+    // changed and the guard never ran again. The result was a profile card for
+    // "ELAN Customer" sitting under a "You must be signed in" banner.
     const speaker = appBySource(event.detail?.source)
-    if (speaker && speaker.id !== current.id) return
+    if (speaker && speaker.id !== current.id) {
+      setRouteSoon(mounted.get(speaker.id), path)
+      return
+    }
 
     // How an app is told the shell took ownership of navigation. Account's
     // requestNavigation() checks this before touching history itself.
@@ -249,7 +274,7 @@ export function startRouter() {
     // <router-view> empty when its in-flight navigation is superseded. That is
     // what a deep link to /checkout/shipping with no shipping data on file
     // rendered: a correct URL, a mounted app, and a blank page.
-    if (speaker?.awaitsRouteEcho) setRoute(current.element, path)
+    if (speaker?.awaitsRouteEcho) setRouteSoon(current.element, path)
   })
 
   // Cart's "Continue Shopping". preventDefault() tells it the shell took over.

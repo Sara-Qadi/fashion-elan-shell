@@ -40,35 +40,35 @@ function renderHeader() {
   // data-nav marks the three app entry points so syncNav can highlight the one
   // currently mounted, whichever control it happens to be.
   return `
-    <div class="elan-promo">FREE STANDARD SHIPPING OVER $150 · USE CODE: ELAN10 FOR 10% OFF</div>
-    <header class="elan-header">
-      <nav class="elan-nav" aria-label="Shop by category" data-nav="catalog">${categories}</nav>
+    <div class="elan-shell-promo">FREE STANDARD SHIPPING OVER $150 · USE CODE: ELAN10 FOR 10% OFF</div>
+    <header class="elan-shell-header">
+      <nav class="elan-shell-nav" aria-label="Shop by category" data-nav="catalog">${categories}</nav>
 
-      <a class="elan-brand" href="${toBrowserPath('/')}" data-shell-link aria-label="ELAN home">
+      <a class="elan-shell-brand" href="${toBrowserPath('/')}" data-shell-link aria-label="ELAN home">
         ELAN
       </a>
 
-      <div class="elan-actions">
-        <button class="elan-icon-btn" type="button" data-search-toggle
+      <div class="elan-shell-actions">
+        <button class="elan-shell-icon-btn" type="button" data-search-toggle
                 aria-label="Search" aria-expanded="false">${icon('search')}</button>
 
-        <a class="elan-icon-btn" href="${toBrowserPath('/wishlist')}" data-shell-link
+        <a class="elan-shell-icon-btn" href="${toBrowserPath('/wishlist')}" data-shell-link
            aria-label="Wishlist">${icon('heart')}</a>
 
-        <a class="elan-icon-btn" href="${toBrowserPath('/account')}" data-shell-link
+        <a class="elan-shell-icon-btn" href="${toBrowserPath('/account')}" data-shell-link
            data-nav="account" aria-label="Account">${icon('person')}</a>
 
-        <a class="elan-icon-btn elan-icon-btn--bag" href="${toBrowserPath('/cart')}" data-shell-link
+        <a class="elan-shell-icon-btn elan-shell-icon-btn--bag" href="${toBrowserPath('/cart')}" data-shell-link
            data-nav="cart" aria-label="Shopping bag">
-          ${icon('bag')}<span class="elan-bag__count" data-bag-count hidden>0</span>
+          ${icon('bag')}<span class="elan-shell-bag__count" data-bag-count hidden>0</span>
         </a>
       </div>
     </header>
 
-    <form class="elan-searchbar" role="search" data-search hidden>
-      <input class="elan-searchbar__input" type="search" name="query"
+    <form class="elan-shell-searchbar" role="search" data-search hidden>
+      <input class="elan-shell-searchbar__input" type="search" name="query"
              placeholder="Search for a piece…" autocomplete="off" aria-label="Search products" />
-      <button class="elan-searchbar__submit" type="submit">Search</button>
+      <button class="elan-shell-searchbar__submit" type="submit">Search</button>
     </form>
   `
 }
@@ -87,15 +87,15 @@ function renderFooter() {
   const apps = MICROFRONTENDS.map(
     (app) =>
       `<li><a href="${toBrowserPath(app.home)}" data-shell-link>${app.label}</a>
-        <span class="elan-footer__owner">${app.framework}</span></li>`,
+        <span class="elan-shell-footer__owner">${app.framework}</span></li>`,
   ).join('')
 
   return `
-    <footer class="elan-footer">
-      <div class="elan-footer__grid">
+    <footer class="elan-shell-footer">
+      <div class="elan-shell-footer__grid">
         <div>
-          <p class="elan-footer__brand">ELAN</p>
-          <p class="elan-footer__blurb">
+          <p class="elan-shell-footer__brand">ELAN</p>
+          <p class="elan-shell-footer__blurb">
             Three independently deployed microfrontends, composed as one storefront.
           </p>
         </div>
@@ -108,7 +108,7 @@ function renderFooter() {
           <ul>${apps}</ul>
         </div>
       </div>
-      <p class="elan-footer__legal">
+      <p class="elan-shell-footer__legal">
         ELAN · University microfrontend project · Payments are mocked and no card data leaves the browser.
       </p>
     </footer>
@@ -117,16 +117,16 @@ function renderFooter() {
 
 function renderInspector() {
   return `
-    <aside class="elan-inspector" data-inspector hidden>
-      <div class="elan-inspector__head">
+    <aside class="elan-shell-inspector" data-inspector hidden>
+      <div class="elan-shell-inspector__head">
         <strong>Event bus</strong>
         <button type="button" data-inspector-close aria-label="Close">×</button>
       </div>
-      <ol class="elan-inspector__list" data-inspector-list>
-        <li class="elan-inspector__empty">Nothing yet. Interact with the app.</li>
+      <ol class="elan-shell-inspector__list" data-inspector-list>
+        <li class="elan-shell-inspector__empty">Nothing yet. Interact with the app.</li>
       </ol>
     </aside>
-    <button class="elan-inspector__toggle" type="button" data-inspector-open>
+    <button class="elan-shell-inspector__toggle" type="button" data-inspector-open>
       Events <span data-inspector-count>0</span>
     </button>
   `
@@ -134,7 +134,7 @@ function renderInspector() {
 
 export function mountChrome() {
   document.getElementById('elan-chrome').innerHTML = renderHeader()
-  document.getElementById('elan-footer').innerHTML = renderFooter()
+  document.getElementById('elan-shell-footer').innerHTML = renderFooter()
   document.getElementById('elan-inspector-root').innerHTML = renderInspector()
 
   const bagCount = document.querySelector('[data-bag-count]')
@@ -205,7 +205,7 @@ export function mountChrome() {
 
     const entry = document.createElement('li')
     entry.innerHTML = `<code>${name}</code><span>${escapeHtml(summarize(detail))}</span>`
-    list.querySelector('.elan-inspector__empty')?.remove()
+    list.querySelector('.elan-shell-inspector__empty')?.remove()
     list.prepend(entry)
     while (list.children.length > 40) list.lastElementChild.remove()
   })

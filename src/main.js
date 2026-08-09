@@ -8,9 +8,12 @@
  */
 import { startBus } from './bus.js'
 import { mountChrome, syncNav } from './chrome.js'
+import { startEnrichment } from './enrich.js'
 import { startRouter } from './router.js'
 import './styles.css'
 
+// Before anything mounts, so it sees an add-to-cart ahead of the Cart element.
+startEnrichment()
 startBus()
 mountChrome()
 startRouter()
