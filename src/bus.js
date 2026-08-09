@@ -26,6 +26,8 @@ export const WATCHED = [
   'elan:cart-updated',
   'elan:checkout-started',
   'elan:order-completed',
+  // Account's acknowledgement that it filed a completed order in its history.
+  'elan:order-history-updated',
   'elan:checkout-completed',
   'elan:add-to-cart',
   'elan:product-selected',

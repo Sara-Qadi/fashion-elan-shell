@@ -80,8 +80,12 @@ export const MICROFRONTENDS = [
     bundle: '/mfe/elan-account.js',
     repo: 'https://github.com/mais-arman/fashion-elan-account-orders',
 
-    // Her Lit components carry their own styles inside the bundle. The sidecar
-    // stylesheet is deliberately NOT loaded — see styles.js for why.
+    // She also publishes /mfe/elan-account.css, and the shell deliberately does
+    // NOT load it: it is 17MB (12.8MB even compressed) because material-symbols
+    // inlines its webfont as base64. Her Lit components carry their own styles
+    // inside the bundle, so the only thing that file provides which a shadow
+    // root cannot is the @font-face — and styles.js declares that from a CDN in
+    // about a kilobyte instead.
     iconFont: 'material-symbols',
 
     rendersOwnChrome: false,
@@ -90,7 +94,15 @@ export const MICROFRONTENDS = [
     // which is emitted on the Cart's confirmation route, not on one of hers.
     listensWhileHidden: true,
 
-    owns: ['/account', '/login', '/register', '/orders', '/wishlist', '/profile'],
+    owns: [
+      '/account',
+      '/login',
+      '/register',
+      '/orders',
+      '/wishlist',
+      '/profile',
+      '/reviews',
+    ],
     home: '/account',
   },
 ]

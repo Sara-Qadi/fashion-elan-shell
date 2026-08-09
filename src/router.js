@@ -50,6 +50,19 @@ function failureMessage(app, error) {
 }
 
 /**
+ * Tells an element where it is.
+ *
+ * Both the property and the attribute, because the three wrappers do not agree
+ * on which one they observe: Lit reflects the property, and a React element
+ * built with r2wc may only see the attribute.
+ */
+function setRoute(element, pathname) {
+  if (!element) return
+  element.route = pathname
+  element.setAttribute('route', pathname)
+}
+
+/**
  * Loads an app and puts its element in the outlet, hidden. Safe to call again;
  * the second call returns the element already there.
  */
@@ -73,7 +86,7 @@ async function ensureMounted(app, route) {
   //    navigate twice, and it reports both hops back as `elan:navigate` — so a
   //    reload of /checkout/payment briefly claimed to be at /cart and the
   //    address bar kept the wrong one.
-  element.setAttribute('route', route ?? app.home)
+  setRoute(element, route ?? app.home)
 
   outlet().appendChild(element)
   mounted.set(app.id, element)
@@ -87,7 +100,7 @@ async function ensureMounted(app, route) {
  */
 async function mount(app, pathname) {
   if (current.id === app.id && current.element) {
-    current.element.setAttribute('route', pathname)
+    setRoute(current.element, pathname)
     return
   }
 
@@ -119,7 +132,7 @@ async function mount(app, pathname) {
 
   // The route goes on before it is shown, so the element never paints the page
   // it was last looking at.
-  element.setAttribute('route', pathname)
+  setRoute(element, pathname)
   for (const [id, node] of mounted) node.hidden = id !== app.id
 
   // Elements are hidden rather than destroyed, so the document keeps whatever
@@ -199,7 +212,7 @@ export function startRouter() {
   // not re-render, or we would push the element back to where it already is.
   window.addEventListener('elan:navigate', (event) => {
     const path = event.detail?.path
-    if (typeof path !== 'string') return
+    if (typeof path !== 'string' || !path.trim()) return
 
     // Only the microfrontend on screen may move the shopper. The others are
     // still mounted and still routing internally — Account's auth guard asks
@@ -208,14 +221,29 @@ export function startRouter() {
     const speaker = appBySource(event.detail?.source)
     if (speaker && speaker.id !== current.id) return
 
+    // How an app is told the shell took ownership of navigation. Account's
+    // requestNavigation() checks this before touching history itself.
+    if (event.cancelable) event.preventDefault()
+
+    const replace = event.detail?.replace === true
+
     const target = resolveApp(path.split('?')[0])
     if (target && target.id !== current.id) {
-      navigate(path)
+      navigate(path, { replace })
       return
     }
 
     const url = toBrowserPath(path)
-    if (url !== location.pathname + location.search) history.replaceState({}, '', url)
+    if (url !== location.pathname + location.search) {
+      if (replace) history.replaceState({}, '', url)
+      else history.pushState({}, '', url)
+    }
+
+    // Staying inside the same app still means telling it where it now is.
+    // Account does not move itself while embedded — it asks, and waits for the
+    // shell to answer by setting `route`. Without this its internal links do
+    // nothing but change the address bar.
+    setRoute(current.element, path)
   })
 
   // Cart's "Continue Shopping". preventDefault() tells it the shell took over.
