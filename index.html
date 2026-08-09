@@ -11,15 +11,26 @@
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%237B1E3A'/%3E%3Ctext x='16' y='23' font-family='Roboto,sans-serif' font-size='18' fill='white' text-anchor='middle'%3EE%3C/text%3E%3C/svg%3E" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!--
+      Playfair Display for the ELAN wordmark and Inter for everything else, so
+      the shared header matches the Catalog app's type rather than sitting on
+      top of it in a different typeface. Roboto stays for the Cart app, which
+      is built on Vuetify's Material defaults.
+    -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Inter:wght@400;500;600&family=Roboto:wght@300;400;500;700;900&display=swap"
       rel="stylesheet"
     />
   </head>
   <body>
     <div id="elan-chrome"></div>
-    <!-- Whichever microfrontend owns the current URL is mounted in here. -->
-    <main id="elan-outlet"></main>
+    <!--
+      Every microfrontend that has been visited stays mounted in here; the one
+      owning the current URL is the only one not hidden. Loading and failure
+      messages go in their own node so they never disturb the mounted elements.
+    -->
+    <main id="elan-outlet"><div id="elan-status"></div></main>
+    <div id="elan-footer"></div>
     <div id="elan-inspector-root"></div>
     <script type="module" src="/src/main.js"></script>
   </body>

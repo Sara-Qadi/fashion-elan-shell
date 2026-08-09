@@ -21,105 +21,328 @@ body {
   margin: 0;
   background: var(--elan-background);
   color: var(--elan-text);
-  font-family: 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  /* Inter first, matching the Catalog app's body face, so the shared header
+     and the page under it read as one design rather than two. */
+  font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
 }
 
-.elan-promo {
-  background: var(--elan-primary);
-  color: #fff;
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
-  text-align: center;
-  padding: 10px 16px;
+/*
+ * Document layout belongs to the shell.
+ *
+ * Vuetify's reset is baked into the Cart bundle's stylesheet and, because that
+ * element renders in the light DOM, it lands on the document and restyles the
+ * root for all three apps. `html { overflow-x: hidden }` is the damaging one:
+ * it makes the root a scroll container, which silently breaks `position:
+ * sticky` on the header — the nav simply scrolled away on long catalog pages
+ * with no error anywhere. Taking body's overflow back restores it.
+ *
+ * !important because that stylesheet is injected at runtime, so it lands after
+ * this one and would otherwise win on equal specificity.
+ */
+body {
+  overflow: visible !important;
 }
 
-.elan-header {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  padding: 14px 24px;
-  background: var(--elan-surface);
-  border-bottom: 1px solid var(--elan-border);
+/*
+ * The whole chrome block sticks, not the header inside it. A sticky element can
+ * only travel within its own parent's box, and #elan-chrome is exactly as tall
+ * as the promo strip plus the header — so sticking the header to it pinned it
+ * to nothing and the nav scrolled away on every long catalog page.
+ */
+#elan-chrome {
   position: sticky;
   top: 0;
   z-index: 50;
 }
 
-.elan-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  text-decoration: none;
-  color: inherit;
-}
-
-.elan-brand__mark {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
+.elan-promo {
   background: var(--elan-primary);
   color: #fff;
-  font-weight: 700;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-align: center;
+  padding: 9px 16px;
 }
 
-.elan-brand__word {
-  font-size: 1.2rem;
-  font-weight: 300;
-  letter-spacing: 0.34em;
+.elan-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+  padding: 0 32px;
+  min-height: 72px;
+  background: var(--elan-surface);
+  border-bottom: 1px solid var(--elan-border);
 }
+
+/* ---------- Category nav ---------- */
 
 .elan-nav {
   display: flex;
-  gap: 4px;
-  margin-left: auto;
+  align-items: center;
+  gap: 28px;
+  min-width: 0;
 }
 
 .elan-nav a {
-  padding: 8px 16px;
-  border-radius: 999px;
+  position: relative;
+  padding: 4px 0;
   text-decoration: none;
-  color: var(--elan-text-muted);
-  font-size: 0.92rem;
+  color: var(--elan-text);
+  font-size: 0.76rem;
   font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
-.elan-nav a:hover {
-  background: #f7e9ec;
+/* Drawn as a pseudo-element so hover does not shift the row by a pixel. */
+.elan-nav a::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 1.5px;
+  background: var(--elan-primary);
+  transform: scaleX(0);
+  transition: transform 0.18s ease;
+}
+
+.elan-nav a:hover,
+.elan-nav a.is-current {
   color: var(--elan-primary);
 }
 
-.elan-nav a.is-active {
-  background: var(--elan-primary);
-  color: #fff;
+.elan-nav a:hover::after,
+.elan-nav a.is-current::after {
+  transform: scaleX(1);
 }
 
-.elan-bag {
-  display: inline-flex;
+/* ---------- Wordmark ---------- */
+
+.elan-brand {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.7rem;
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  /* The tracking above is all trailing, which pushes the word visually left of
+     centre; half of it back as padding re-centres the glyphs themselves. */
+  padding-left: 0.26em;
+  color: var(--elan-primary);
+  text-decoration: none;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* ---------- Icon actions ---------- */
+
+.elan-actions {
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 9px 16px;
-  border: 1px solid var(--elan-border);
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.elan-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
   border-radius: 999px;
-  background: var(--elan-surface);
+  background: none;
   color: var(--elan-text);
-  font: inherit;
-  font-size: 0.9rem;
   cursor: pointer;
+  text-decoration: none;
+}
+
+.elan-icon-btn svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.elan-icon-btn:hover {
+  background: #f7edea;
+  color: var(--elan-primary);
+}
+
+.elan-icon-btn.is-active {
+  color: var(--elan-primary);
+}
+
+.elan-icon-btn--bag {
+  position: relative;
 }
 
 .elan-bag__count {
+  position: absolute;
+  top: 2px;
+  right: 0;
   display: grid;
   place-items: center;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
   border-radius: 999px;
   background: var(--elan-primary);
   color: #fff;
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   font-weight: 700;
+  line-height: 1;
+}
+
+/* ---------- Search ---------- */
+
+.elan-searchbar {
+  display: flex;
+  gap: 10px;
+  padding: 14px 32px;
+  background: var(--elan-surface);
+  border-bottom: 1px solid var(--elan-border);
+}
+
+.elan-searchbar__input {
+  flex: 1;
+  padding: 11px 18px;
+  border: 1px solid var(--elan-border);
+  border-radius: 999px;
+  background: var(--elan-background);
+  color: var(--elan-text);
+  font: inherit;
+  font-size: 0.92rem;
+}
+
+.elan-searchbar__input:focus-visible {
+  outline: 2px solid var(--elan-primary);
+  outline-offset: 1px;
+}
+
+.elan-searchbar__submit {
+  padding: 11px 26px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--elan-primary);
+  color: #fff;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+/* ---------- Chrome suppression ----------
+ *
+ * The header, the nav and the footer belong to the shell, and they stay on
+ * screen no matter which microfrontend is mounted. Each app also renders its
+ * own set when it runs standalone — correctly, because standalone it is the
+ * whole page — so embedding one unedited puts two headers and two footers on
+ * screen at once.
+ *
+ * The Cart app is told it is embedded and drops its own (see the `embedded`
+ * flag in its element build), which is the right way to do this. Catalog has no
+ * such flag yet, and its React tree renders in the light DOM, so the shell can
+ * do it from out here in the meantime. These selectors match MUI's own class
+ * names rather than anything of Maha's, so they survive her editing the
+ * component — but they are a stopgap, and docs/PROMPT-catalog-react.md asks for
+ * the same `embedded` flag the Cart app has.
+ *
+ * Nothing is needed for Account: its Lit element renders pages only, and the
+ * standalone header lives outside the element in its own index.html.
+ */
+
+elan-catalog-app header.MuiAppBar-root,
+elan-catalog-app footer {
+  display: none !important;
+}
+
+/* Its layout box still asks for a full viewport it no longer fills. */
+elan-catalog-app > .MuiBox-root {
+  min-height: 0 !important;
+}
+
+/* ---------- Footer ---------- */
+
+.elan-footer {
+  padding: 56px 32px 28px;
+  margin-top: 64px;
+  background: var(--elan-text);
+  color: #ede0d8;
+  font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+}
+
+.elan-footer__grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 40px;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.elan-footer__brand {
+  margin: 0 0 12px;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  color: #fff;
+}
+
+.elan-footer__blurb {
+  margin: 0;
+  max-width: 42ch;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: #a29490;
+}
+
+.elan-footer h2 {
+  margin: 0 0 14px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--elan-secondary);
+}
+
+.elan-footer ul {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.elan-footer a {
+  color: #ede0d8;
+  text-decoration: none;
+  font-size: 0.88rem;
+}
+
+.elan-footer a:hover {
+  color: var(--elan-secondary);
+}
+
+.elan-footer__owner {
+  display: block;
+  font-size: 0.72rem;
+  color: #8d817d;
+}
+
+.elan-footer__legal {
+  max-width: 1180px;
+  margin: 36px auto 0;
+  padding-top: 20px;
+  border-top: 1px solid #3a3033;
+  font-size: 0.76rem;
+  color: #8d817d;
 }
 
 /* ---------- Status / failure states ---------- */
@@ -242,16 +465,60 @@ body {
   color: var(--elan-text-muted);
 }
 
-@media (max-width: 720px) {
+@media (max-width: 1080px) {
   .elan-header {
-    flex-wrap: wrap;
-    gap: 12px;
+    grid-template-columns: 1fr auto;
+    grid-template-areas: 'brand actions' 'nav nav';
+    gap: 4px;
+    padding: 12px 20px 0;
   }
 
+  .elan-brand {
+    grid-area: brand;
+    justify-self: start;
+    padding-left: 0;
+  }
+
+  .elan-actions {
+    grid-area: actions;
+  }
+
+  /* Horizontal scroll rather than a hamburger: six categories still fit on a
+     phone if they are allowed to run off the edge, and a drawer would be one
+     more thing to keep in step with Catalog's own routes. */
   .elan-nav {
-    order: 3;
-    width: 100%;
-    margin-left: 0;
-    justify-content: space-between;
+    grid-area: nav;
+    gap: 22px;
+    overflow-x: auto;
+    padding: 10px 0 12px;
+    scrollbar-width: none;
+  }
+
+  .elan-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .elan-searchbar {
+    padding: 12px 20px;
+  }
+
+  .elan-footer__grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+}
+
+@media (max-width: 560px) {
+  .elan-promo {
+    font-size: 0.6rem;
+    letter-spacing: 0.06em;
+  }
+
+  .elan-brand {
+    font-size: 1.35rem;
+  }
+
+  .elan-searchbar__submit {
+    padding: 11px 18px;
   }
 }

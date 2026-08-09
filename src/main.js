@@ -16,8 +16,10 @@ mountChrome()
 startRouter()
 syncNav()
 
-// The router swaps document.body.dataset.activeApp; mirror it into the nav.
+// The router writes the active app and the current path onto the body; mirror
+// both into the nav, so the header highlights the right app and, inside
+// Catalog, the category actually being browsed.
 new MutationObserver(syncNav).observe(document.body, {
   attributes: true,
-  attributeFilter: ['data-active-app'],
+  attributeFilter: ['data-active-app', 'data-app-path'],
 })

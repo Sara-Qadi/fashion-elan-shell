@@ -1,19 +1,24 @@
 /**
  * Loads a microfrontend's bundle from its LIVE deployment.
  *
- * Two strategies, in order:
+ * Three strategies, in order:
  *
  *  1. the stable entry (origin + bundle). This is what the team agreed each app
  *     publishes: one unhashed filename that registers the custom element.
  *
- *  2. discovery. If the stable entry 404s, fetch the app's index.html and pull
- *     the hashed <script type="module"> out of it. Vite renames that file on
- *     every deploy, so this can only ever be a fallback — but it means the shell
- *     still works against an app that has not added the stable entry yet.
+ *  2. any extraEntries the registry lists — a mirror of the same build for an
+ *     app whose host is not serving the agreed URL yet.
  *
- * Either way the module is imported cross-origin, which every one of the three
- * hosts allows (all send Access-Control-Allow-Origin: *).
+ *  3. discovery. If none of those work, fetch the app's index.html and pull the
+ *     hashed <script type="module"> out of it. Vite renames that file on every
+ *     deploy, so this can only ever be a last resort — but it means the shell
+ *     still shows something for an app that has not published an element build.
+ *
+ * Either way the module is imported cross-origin, which every one of the hosts
+ * allows (all send Access-Control-Allow-Origin: *).
  */
+import { entryCandidates } from './registry.js'
+import { ensureIconFont } from './styles.js'
 
 const loads = new Map()
 
@@ -47,21 +52,31 @@ async function discoverEntry(origin) {
   return new URL(match[1], `${origin}/`).href
 }
 
-async function importFirstThatWorks(app) {
-  const stable = versioned(`${app.origin}${app.bundle}`)
-
+/**
+ * A missing file on GitHub Pages returns a 404 page, and on Vercel the SPA
+ * rewrite answers with index.html and a 200. Both import "successfully" as a
+ * module and silently register nothing, so the content type is the only
+ * trustworthy signal that a URL is really the bundle.
+ */
+async function servesJavaScript(url) {
   try {
-    // A missing file on GitHub Pages / Vercel returns an HTML 404 page, which
-    // imports "successfully" as a module and silently registers nothing. Check
-    // the content type before trusting it.
-    const head = await fetch(stable, { method: 'HEAD', mode: 'cors' })
+    const head = await fetch(url, { method: 'HEAD', mode: 'cors' })
     const type = head.headers.get('content-type') ?? ''
-    if (head.ok && type.includes('javascript')) {
-      await import(/* @vite-ignore */ stable)
-      return { url: stable, strategy: 'stable' }
-    }
+    return head.ok && type.includes('javascript')
   } catch {
-    // fall through to discovery
+    return false
+  }
+}
+
+async function importFirstThatWorks(app) {
+  const candidates = entryCandidates(app)
+
+  for (const [index, candidate] of candidates.entries()) {
+    const url = versioned(candidate)
+    if (!(await servesJavaScript(url))) continue
+
+    await import(/* @vite-ignore */ url)
+    return { url: candidate, strategy: index === 0 ? 'stable' : 'mirror' }
   }
 
   const discovered = await discoverEntry(app.origin)
@@ -77,6 +92,8 @@ export function loadMicrofrontend(app) {
   if (loads.has(app.id)) return loads.get(app.id)
 
   const load = (async () => {
+    ensureIconFont(app)
+
     if (customElements.get(app.tag)) return { url: 'already-registered', strategy: 'preloaded' }
 
     const result = await importFirstThatWorks(app)

@@ -9,15 +9,27 @@
  */
 import { currentAppPath, toAppPath, toBrowserPath } from './basePath.js'
 import { loadMicrofrontend } from './loader.js'
-import { MICROFRONTENDS, resolveApp } from './registry.js'
+import { appBySource, MICROFRONTENDS, resolveApp } from './registry.js'
 
 const outlet = () => document.getElementById('elan-outlet')
+const statusNode = () => document.getElementById('elan-status')
+
+/**
+ * Mounted elements, by app id. Nothing is ever removed from here.
+ *
+ * A microfrontend that owns shared state cannot be torn down when the shopper
+ * navigates away from it. The bag is the clear case: Catalog announces a chosen
+ * product with `elan:add-to-cart`, and only the Cart element knows what to do
+ * with that — so if it is not on the page while the shopper is browsing, every
+ * add silently disappears. Keeping each element mounted and merely hidden also
+ * means a half-filled checkout form survives a trip back to the catalog.
+ */
+const mounted = new Map()
 
 let current = { id: null, element: null }
 
 function setStatus(html, tone = 'info') {
-  const node = outlet()
-  node.innerHTML = `<div class="elan-status elan-status--${tone}">${html}</div>`
+  statusNode().innerHTML = html ? `<div class="elan-status elan-status--${tone}">${html}</div>` : ''
 }
 
 function failureMessage(app, error) {
@@ -38,9 +50,40 @@ function failureMessage(app, error) {
 }
 
 /**
- * Mounting is per-app, not per-navigation: switching from /cart to
- * /checkout/shipping must not tear the element down, or the shopper would lose
- * everything they typed. Only a change of *app* replaces the element.
+ * Loads an app and puts its element in the outlet, hidden. Safe to call again;
+ * the second call returns the element already there.
+ */
+async function ensureMounted(app, route) {
+  const existing = mounted.get(app.id)
+  if (existing) return existing
+
+  await loadMicrofrontend(app)
+
+  const element = document.createElement(app.tag)
+  element.dataset.elanApp = app.id
+  element.hidden = true
+
+  // Set before it is connected, and set to where the element is actually
+  // wanted. Two reasons it must never be left empty or approximate:
+  //
+  //  - An element with no route cannot tell it is embedded. The Account app
+  //    decides from exactly that, and unset it treats itself as the whole page
+  //    and lets its auth guard rewrite the address bar out from under us.
+  //  - Mounting at the app's home and correcting afterwards makes the element
+  //    navigate twice, and it reports both hops back as `elan:navigate` — so a
+  //    reload of /checkout/payment briefly claimed to be at /cart and the
+  //    address bar kept the wrong one.
+  element.setAttribute('route', route ?? app.home)
+
+  outlet().appendChild(element)
+  mounted.set(app.id, element)
+  return element
+}
+
+/**
+ * Switching from /cart to /checkout/shipping must not tear the element down, or
+ * the shopper would lose everything they typed — so navigation only ever
+ * changes which element is visible and what `route` the active one is given.
  */
 async function mount(app, pathname) {
   if (current.id === app.id && current.element) {
@@ -48,26 +91,58 @@ async function mount(app, pathname) {
     return
   }
 
-  setStatus(`<p class="elan-status__loading">Loading ${app.label}…</p>`, 'loading')
+  if (!mounted.has(app.id)) {
+    setStatus(`<p class="elan-status__loading">Loading ${app.label}…</p>`, 'loading')
+  }
 
+  let element
   try {
-    await loadMicrofrontend(app)
+    element = await ensureMounted(app, pathname)
   } catch (error) {
     setStatus(failureMessage(app, error), 'error')
     current = { id: null, element: null }
     return
   }
 
-  const element = document.createElement(app.tag)
-  element.setAttribute('route', pathname)
-  element.dataset.elanApp = app.id
+  // Another navigation may have resolved first while this one was loading.
+  if (resolveApp(toAppPath()) !== app) return
 
-  const node = outlet()
-  node.innerHTML = ''
-  node.appendChild(element)
+  setStatus('')
 
+  // Claim active status first. The route change below makes the element route
+  // internally and report back with `elan:navigate`, and the handler for that
+  // ignores anything from an app that is not current — so if this ran after,
+  // the active app's very first navigation would be discarded as background
+  // chatter and the address bar would keep the previous route.
   current = { id: app.id, element }
   document.body.dataset.activeApp = app.id
+
+  // The route goes on before it is shown, so the element never paints the page
+  // it was last looking at.
+  element.setAttribute('route', pathname)
+  for (const [id, node] of mounted) node.hidden = id !== app.id
+
+  // Elements are hidden rather than destroyed, so the document keeps whatever
+  // scroll offset the previous app left behind — arriving at the bag halfway
+  // down the page. 'instant' because Vuetify's reset turns on smooth scrolling
+  // document-wide, and animating this reads as a glitch rather than a move.
+  window.scrollTo({ top: 0, behavior: 'instant' })
+}
+
+/**
+ * Brings up the microfrontends that need to be listening even when they are not
+ * on screen, once the app the shopper actually asked for is up.
+ *
+ * Cart must hear `elan:add-to-cart` from the Catalog page, and Account must
+ * hear `elan:order-completed` to file the order in its history — neither of
+ * which happens on a route those apps own. Failures are ignored: this is a
+ * background nicety, and the visible app already reported anything real.
+ */
+export function preloadBackgroundApps() {
+  for (const app of MICROFRONTENDS) {
+    if (!app.listensWhileHidden || mounted.has(app.id)) continue
+    ensureMounted(app).catch(() => {})
+  }
 }
 
 /** Takes an APP path (/cart), not a browser path (/fashion-elan-shell/cart). */
@@ -85,7 +160,12 @@ export function render() {
   const appPath = currentAppPath()
   const app = resolveApp(toAppPath())
 
+  // Mirrored onto the body so the chrome can react to a route change without
+  // the header having to import the router and the router the header.
+  document.body.dataset.appPath = appPath
+
   if (!app) {
+    for (const node of mounted.values()) node.hidden = true
     setStatus(
       `<h2>404</h2><p>No microfrontend owns <code>${escapeHtml(appPath)}</code>.</p>
        <p><a href="${toBrowserPath('/')}" data-shell-link>Back to the shop</a></p>`,
@@ -96,7 +176,7 @@ export function render() {
     return
   }
 
-  mount(app, appPath)
+  mount(app, appPath).then(preloadBackgroundApps)
   document.title = `ELAN — ${app.label}`
 }
 
@@ -120,6 +200,13 @@ export function startRouter() {
   window.addEventListener('elan:navigate', (event) => {
     const path = event.detail?.path
     if (typeof path !== 'string') return
+
+    // Only the microfrontend on screen may move the shopper. The others are
+    // still mounted and still routing internally — Account's auth guard asks
+    // for /login the moment it loads — and a hidden app must not be able to
+    // navigate the page away from whatever the shopper is actually looking at.
+    const speaker = appBySource(event.detail?.source)
+    if (speaker && speaker.id !== current.id) return
 
     const target = resolveApp(path.split('?')[0])
     if (target && target.id !== current.id) {
