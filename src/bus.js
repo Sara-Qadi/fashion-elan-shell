@@ -43,6 +43,8 @@ export const WATCHED = [
   'elan:profile-updated',
   'elan:navigate',
   'elan:navigate-catalog',
+  // Checkout asking the shell to route the shopper through sign-in first.
+  'elan:sign-in-required',
 ]
 
 const listeners = new Set()

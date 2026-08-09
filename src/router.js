@@ -28,6 +28,9 @@ const mounted = new Map()
 
 let current = { id: null, element: null }
 
+/** Where to send the shopper once they have signed in. See startRouter(). */
+let pendingReturn = null
+
 function setStatus(html, tone = 'info') {
   statusNode().innerHTML = html ? `<div class="elan-shell-status elan-shell-status--${tone}">${html}</div>` : ''
 }
@@ -283,6 +286,39 @@ export function startRouter() {
     const catalog = MICROFRONTENDS.find((app) => app.id === 'catalog')
     navigate(catalog?.home ?? '/')
   })
+
+  /*
+   * "This shopper needs an account before I can continue."
+   *
+   * Routing across microfrontends is the shell's job, and so is remembering
+   * why: Checkout sends the shopper to Account's sign-in page, and something
+   * has to bring them back to the step they were on rather than dumping them on
+   * a profile page to find their own way. Neither app can do that alone —
+   * Checkout does not own the URL, and Account has never heard of checkout.
+   */
+  window.addEventListener('elan:sign-in-required', (event) => {
+    event.preventDefault()
+
+    const requested = event.detail?.returnTo
+    pendingReturn = typeof requested === 'string' && requested.startsWith('/') ? requested : null
+
+    navigate('/login')
+  })
+
+  // Account announces a sign-in. If it happened because checkout asked for one,
+  // this is the other half of that round trip.
+  for (const name of ['elan:user-logged-in', 'elan:user-registered']) {
+    window.addEventListener(name, () => {
+      if (!pendingReturn) return
+
+      const destination = pendingReturn
+      pendingReturn = null
+
+      // After the current task, so the signing-in app finishes its own update
+      // and its "go to my profile" request lands before this overrides it.
+      setTimeout(() => navigate(destination, { replace: true }), 0)
+    })
+  }
 
   render()
 }
