@@ -31,6 +31,36 @@ let current = { id: null, element: null }
 /** Where to send the shopper once they have signed in. See startRouter(). */
 let pendingReturn = null
 
+/**
+ * The last signed-in customer Account announced, kept so it can be replayed.
+ *
+ * `elan:user-logged-in` is a broadcast: it reaches whoever is listening at the
+ * moment it fires, and nobody afterwards. Elements here are mounted lazily, so
+ * an app loaded after the sign-in — Cart, if the shopper went straight to
+ * Account first — never hears it and behaves as though nobody is signed in.
+ * The shell is the only party that sees the whole session, so remembering it
+ * and re-announcing to late arrivals is its job.
+ */
+let lastIdentity = null
+
+/**
+ * Marks a replay, so the sign-in round trip does not fire a second time and
+ * bounce a shopper who is simply navigating.
+ */
+function replayIdentity(element) {
+  if (!lastIdentity || !element) return
+
+  setTimeout(() => {
+    element.dispatchEvent(
+      new CustomEvent('elan:user-logged-in', {
+        detail: { ...lastIdentity, replayed: true },
+        bubbles: true,
+        composed: true,
+      }),
+    )
+  }, 0)
+}
+
 function setStatus(html, tone = 'info') {
   statusNode().innerHTML = html ? `<div class="elan-shell-status elan-shell-status--${tone}">${html}</div>` : ''
 }
@@ -109,6 +139,10 @@ async function ensureMounted(app, route) {
 
   outlet().appendChild(element)
   mounted.set(app.id, element)
+
+  // Catch this element up on the session it was not around to hear about.
+  replayIdentity(element)
+
   return element
 }
 
@@ -308,7 +342,11 @@ export function startRouter() {
   // Account announces a sign-in. If it happened because checkout asked for one,
   // this is the other half of that round trip.
   for (const name of ['elan:user-logged-in', 'elan:user-registered']) {
-    window.addEventListener(name, () => {
+    window.addEventListener(name, (event) => {
+      if (event.detail?.replayed) return
+
+      lastIdentity = event.detail?.user ? { user: event.detail.user } : null
+
       if (!pendingReturn) return
 
       const destination = pendingReturn
@@ -319,6 +357,10 @@ export function startRouter() {
       setTimeout(() => navigate(destination, { replace: true }), 0)
     })
   }
+
+  window.addEventListener('elan:user-logged-out', () => {
+    lastIdentity = null
+  })
 
   render()
 }
