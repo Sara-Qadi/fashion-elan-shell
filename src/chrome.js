@@ -12,231 +12,760 @@ import { navigate } from './router.js'
 
 /**
  * The categories the Catalog app knows about, in its own order. Each one is a
- * /category/<name> route, which the registry gives to Catalog and which its
+ * /category/ route, which the registry gives to Catalog and which its
  * element maps onto its internal /products?category=… view.
  */
-const CATEGORIES = ['Women', 'Men', 'Kids', 'Shoes', 'Bags', 'Accessories']
+const CATEGORIES = [
+  'Women',
+  'Men',
+  'Kids',
+  'Shoes',
+  'Bags',
+  'Accessories',
+]
 
-/** Inline so the header needs no icon font and paints with the first byte. */
+/**
+ * Inline icons so the shared header does not depend on another icon library.
+ *
+ * IMPORTANT:
+ * The shell CSS expects:
+ *
+ * fill: none
+ * stroke: currentColor
+ *
+ * so these icons stay line-based.
+ */
 const ICONS = {
-  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
-  heart:
-    '<path d="M12 20s-7-4.4-7-9.3A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7 2.7C19 15.6 12 20 12 20Z"/>',
-  person: '<circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.6 3.1-5.6 7-5.6s7 2 7 5.6"/>',
-  bag: '<path d="M6 8h12l-1 12H7L6 8Z"/><path d="M9.5 8V6.5a2.5 2.5 0 0 1 5 0V8"/>',
+  search: `
+    <circle cx="11" cy="11" r="6"></circle>
+    <path d="m16 16 4 4"></path>
+  `,
+
+  heart: `
+    <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"></path>
+  `,
+
+  person: `
+    <circle cx="12" cy="8" r="4"></circle>
+    <path d="M5 21v-2a7 7 0 0 1 14 0v2"></path>
+  `,
+
+  bag: `
+    <path d="M6 8h12l1 13H5L6 8Z"></path>
+    <path d="M9 8V6a3 3 0 0 1 6 0v2"></path>
+  `,
 }
 
 function icon(name) {
-  return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICONS[name]}</svg>`
+  return `
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      ${ICONS[name]}
+    </svg>
+  `
 }
 
+/**
+ * Shared ELAN header.
+ */
 function renderHeader() {
   const categories = CATEGORIES.map(
-    (name) =>
-      `<a href="${toBrowserPath(`/category/${encodeURIComponent(name)}`)}"
-          data-shell-link data-category="${name}">${name}</a>`,
+    (name) => `
+      <a
+        href="${toBrowserPath(`/category/${encodeURIComponent(name)}`)}"
+        data-shell-link
+        data-category="${name}"
+      >
+        ${name}
+      </a>
+    `,
   ).join('')
 
-  // data-nav marks the three app entry points so syncNav can highlight the one
-  // currently mounted, whichever control it happens to be.
   return `
-    <div class="elan-shell-promo">FREE STANDARD SHIPPING OVER $150 · USE CODE: ELAN10 FOR 10% OFF</div>
-    <header class="elan-shell-header">
-      <nav class="elan-shell-nav" aria-label="Shop by category" data-nav="catalog">${categories}</nav>
+    <div class="elan-shell-promo">
+      FREE STANDARD SHIPPING OVER $150 · USE CODE: ELAN10 FOR 10% OFF
+    </div>
 
-      <a class="elan-shell-brand" href="${toBrowserPath('/')}" data-shell-link aria-label="ELAN home">
+    <header class="elan-shell-header">
+
+      <nav
+        class="elan-shell-nav"
+        aria-label="Shop categories"
+      >
+        ${categories}
+      </nav>
+
+      <a
+        class="elan-shell-brand"
+        href="${toBrowserPath('/')}"
+        data-shell-link
+        aria-label="ELAN home"
+      >
         ELAN
       </a>
 
       <div class="elan-shell-actions">
-        <button class="elan-shell-icon-btn" type="button" data-search-toggle
-                aria-label="Search" aria-expanded="false">${icon('search')}</button>
 
-        <a class="elan-shell-icon-btn" href="${toBrowserPath('/wishlist')}" data-shell-link
-           aria-label="Wishlist">${icon('heart')}</a>
+        <button
+          class="elan-shell-icon-btn"
+          type="button"
+          data-search-toggle
+          aria-label="Search"
+          aria-expanded="false"
+        >
+          ${icon('search')}
+        </button>
 
-        <a class="elan-shell-icon-btn" href="${toBrowserPath('/account')}" data-shell-link
-           data-nav="account" aria-label="Account">${icon('person')}</a>
-
-        <a class="elan-shell-icon-btn elan-shell-icon-btn--bag" href="${toBrowserPath('/cart')}" data-shell-link
-           data-nav="cart" aria-label="Shopping bag">
-          ${icon('bag')}<span class="elan-shell-bag__count" data-bag-count hidden>0</span>
+        <a
+          class="elan-shell-icon-btn"
+          href="${toBrowserPath('/wishlist')}"
+          data-shell-link
+          data-nav="wishlist"
+          aria-label="Wishlist"
+        >
+          ${icon('heart')}
         </a>
+
+        <a
+          class="elan-shell-icon-btn"
+          href="${toBrowserPath('/account')}"
+          data-shell-link
+          data-nav="account"
+          aria-label="Account"
+        >
+          ${icon('person')}
+        </a>
+
+        <a
+          class="elan-shell-icon-btn elan-shell-icon-btn--bag"
+          href="${toBrowserPath('/cart')}"
+          data-shell-link
+          data-nav="cart"
+          aria-label="Shopping bag"
+        >
+          ${icon('bag')}
+
+          <span
+            class="elan-shell-bag__count"
+            data-bag-count
+            hidden
+          >
+            0
+          </span>
+        </a>
+
       </div>
+
     </header>
 
-    <form class="elan-shell-searchbar" role="search" data-search hidden>
-      <input class="elan-shell-searchbar__input" type="search" name="query"
-             placeholder="Search for a piece…" autocomplete="off" aria-label="Search products" />
-      <button class="elan-shell-searchbar__submit" type="submit">Search</button>
+    <form
+      class="elan-shell-searchbar"
+      role="search"
+      data-search
+      hidden
+    >
+
+      <input
+        class="elan-shell-searchbar__input"
+        type="search"
+        name="query"
+        placeholder="Search for a piece…"
+        autocomplete="off"
+        aria-label="Search products"
+      />
+
+      <button
+        class="elan-shell-searchbar__submit"
+        type="submit"
+      >
+        Search
+      </button>
+
     </form>
   `
 }
 
 /**
- * The shell suppresses each microfrontend's own footer along with its header
- * (see chrome-suppression in styles.css), so it has to supply one — otherwise
- * the composed page just stops at the bottom of whatever is mounted.
+ * The shell suppresses each microfrontend's own footer along with its header,
+ * so it supplies one shared footer.
  */
 function renderFooter() {
   const shop = CATEGORIES.map(
-    (name) =>
-      `<li><a href="${toBrowserPath(`/category/${encodeURIComponent(name)}`)}" data-shell-link>${name}</a></li>`,
+    (name) => `
+      <li>
+        <a
+          href="${toBrowserPath(`/category/${encodeURIComponent(name)}`)}"
+          data-shell-link
+        >
+          ${name}
+        </a>
+      </li>
+    `,
   ).join('')
 
   const apps = MICROFRONTENDS.map(
-    (app) =>
-      `<li><a href="${toBrowserPath(app.home)}" data-shell-link>${app.label}</a>
-        <span class="elan-shell-footer__owner">${app.framework}</span></li>`,
+    (app) => `
+      <li>
+        <a
+          href="${toBrowserPath(app.home)}"
+          data-shell-link
+        >
+          ${app.label}
+        </a>
+
+        <span class="elan-shell-footer__owner">
+          ${app.framework}
+        </span>
+      </li>
+    `,
   ).join('')
 
   return `
     <footer class="elan-shell-footer">
+
       <div class="elan-shell-footer__grid">
+
         <div>
-          <p class="elan-shell-footer__brand">ELAN</p>
+          <p class="elan-shell-footer__brand">
+            ELAN
+          </p>
+
           <p class="elan-shell-footer__blurb">
-            Three independently deployed microfrontends, composed as one storefront.
+            Three independently deployed microfrontends,
+            composed as one storefront.
           </p>
         </div>
+
         <div>
           <h2>Shop</h2>
-          <ul>${shop}</ul>
+
+          <ul>
+            ${shop}
+          </ul>
         </div>
+
         <div>
           <h2>This build</h2>
-          <ul>${apps}</ul>
+
+          <ul>
+            ${apps}
+          </ul>
         </div>
+
       </div>
+
       <p class="elan-shell-footer__legal">
-        ELAN · University microfrontend project · Payments are mocked and no card data leaves the browser.
+        ELAN · University microfrontend project ·
+        Payments are mocked and no card data leaves the browser.
       </p>
+
     </footer>
   `
 }
 
+/**
+ * Event inspector shown during the integration demo.
+ */
 function renderInspector() {
   return `
-    <aside class="elan-shell-inspector" data-inspector hidden>
+    <aside
+      class="elan-shell-inspector"
+      data-inspector
+      hidden
+    >
+
       <div class="elan-shell-inspector__head">
-        <strong>Event bus</strong>
-        <button type="button" data-inspector-close aria-label="Close">×</button>
+
+        <strong>
+          Event bus
+        </strong>
+
+        <button
+          type="button"
+          data-inspector-close
+          aria-label="Close"
+        >
+          ×
+        </button>
+
       </div>
-      <ol class="elan-shell-inspector__list" data-inspector-list>
-        <li class="elan-shell-inspector__empty">Nothing yet. Interact with the app.</li>
+
+      <ol
+        class="elan-shell-inspector__list"
+        data-inspector-list
+      >
+        <li class="elan-shell-inspector__empty">
+          Nothing yet. Interact with the app.
+        </li>
       </ol>
+
     </aside>
-    <button class="elan-shell-inspector__toggle" type="button" data-inspector-open>
-      Events <span data-inspector-count>0</span>
+
+    <button
+      class="elan-shell-inspector__toggle"
+      type="button"
+      data-inspector-open
+    >
+      Events
+
+      <span data-inspector-count>
+        0
+      </span>
     </button>
   `
 }
 
 export function mountChrome() {
-  document.getElementById('elan-chrome').innerHTML = renderHeader()
-  document.getElementById('elan-shell-footer').innerHTML = renderFooter()
-  document.getElementById('elan-inspector-root').innerHTML = renderInspector()
+  document.getElementById('elan-chrome').innerHTML =
+    renderHeader()
 
-  const bagCount = document.querySelector('[data-bag-count]')
+  document.getElementById('elan-shell-footer').innerHTML =
+    renderFooter()
 
-  // The bag badge lives in the shell, but only the Cart element knows the count.
-  // The shell keeps that element mounted so the number stays live on every page
-  // — this remembers it across reloads so the badge is right on first paint,
-  // before the Cart bundle has finished loading.
+  document.getElementById('elan-inspector-root').innerHTML =
+    renderInspector()
+
+  const bagCount =
+    document.querySelector('[data-bag-count]')
+
+  /**
+   * The bag badge lives in the shell, but Cart owns the actual cart state.
+   */
   const REMEMBERED = 'elan.shell.bag-count'
 
   const setBagCount = (value) => {
     const count = Number(value) || 0
-    bagCount.textContent = String(count)
-    bagCount.hidden = count === 0
+
+    bagCount.textContent =
+      String(count)
+
+    bagCount.hidden =
+      count === 0
+
     try {
-      sessionStorage.setItem(REMEMBERED, String(count))
+      sessionStorage.setItem(
+        REMEMBERED,
+        String(count),
+      )
     } catch {
-      // Private mode or a full quota: the badge is still correct in-page.
+      // Badge continues to work in the current page.
     }
   }
 
-  setBagCount(sessionStorage.getItem(REMEMBERED) ?? 0)
-  const list = document.querySelector('[data-inspector-list]')
-  const panel = document.querySelector('[data-inspector]')
-  const counter = document.querySelector('[data-inspector-count]')
+  setBagCount(
+    sessionStorage.getItem(REMEMBERED) ?? 0,
+  )
+
+  const list =
+    document.querySelector(
+      '[data-inspector-list]',
+    )
+
+  const panel =
+    document.querySelector(
+      '[data-inspector]',
+    )
+
+  const counter =
+    document.querySelector(
+      '[data-inspector-count]',
+    )
+
   let seen = 0
 
-  // Search belongs to Catalog, but the input lives up here because the header is
-  // shared. /search?query=… is part of the route contract Catalog already maps
-  // onto its own /products?search=…, so the shell does not need to know that.
-  const searchBar = document.querySelector('[data-search]')
-  const searchToggle = document.querySelector('[data-search-toggle]')
+  /**
+   * Shared Catalog search.
+   */
+  const searchBar =
+    document.querySelector(
+      '[data-search]',
+    )
 
-  searchToggle.addEventListener('click', () => {
-    const open = searchBar.hidden
-    searchBar.hidden = !open
-    searchToggle.setAttribute('aria-expanded', String(open))
-    if (open) searchBar.querySelector('input').focus()
-  })
+  const searchToggle =
+    document.querySelector(
+      '[data-search-toggle]',
+    )
 
-  searchBar.addEventListener('submit', (event) => {
-    event.preventDefault()
-    const input = searchBar.querySelector('input')
-    const query = input.value.trim()
-    if (!query) return
-    navigate(`/search?query=${encodeURIComponent(query)}`)
-    searchBar.hidden = true
-    searchToggle.setAttribute('aria-expanded', 'false')
-    input.value = ''
-  })
+  searchToggle.addEventListener(
+    'click',
+    () => {
+      /**
+       * Search is Catalog-only.
+       */
+      if (
+        document.body.dataset.activeApp !==
+        'catalog'
+      ) {
+        return
+      }
 
-  document.querySelector('[data-inspector-open]').addEventListener('click', () => {
-    panel.hidden = false
-  })
-  document.querySelector('[data-inspector-close]').addEventListener('click', () => {
-    panel.hidden = true
-  })
+      const open =
+        searchBar.hidden
 
-  onAnyEvent((name, detail) => {
-    // The cart badge is the clearest proof that two microfrontends are talking.
-    if (name === 'elan:cart-updated' && typeof detail.itemCount === 'number') {
-      setBagCount(detail.itemCount)
+      searchBar.hidden =
+        !open
+
+      searchToggle.setAttribute(
+        'aria-expanded',
+        String(open),
+      )
+
+      if (open) {
+        searchBar
+          .querySelector('input')
+          .focus()
+      }
+    },
+  )
+
+  searchBar.addEventListener(
+    'submit',
+    (event) => {
+      event.preventDefault()
+
+      const input =
+        searchBar.querySelector('input')
+
+      const query =
+        input.value.trim()
+
+      if (!query) {
+        return
+      }
+
+      navigate(
+        `/search?query=${encodeURIComponent(query)}`,
+      )
+
+      searchBar.hidden = true
+
+      searchToggle.setAttribute(
+        'aria-expanded',
+        'false',
+      )
+
+      input.value = ''
+    },
+  )
+
+  /**
+   * Event inspector.
+   */
+  document
+    .querySelector('[data-inspector-open]')
+    .addEventListener(
+      'click',
+      () => {
+        panel.hidden = false
+      },
+    )
+
+  document
+    .querySelector('[data-inspector-close]')
+    .addEventListener(
+      'click',
+      () => {
+        panel.hidden = true
+      },
+    )
+
+  /**
+   * Router announces this after route changes.
+   *
+   * This is what allows the Heart / Account active state to change
+   * immediately without Refresh.
+   */
+  window.addEventListener(
+    'elan:shell-route-changed',
+    () => {
+      syncNav()
+    },
+  )
+
+  /**
+   * Global event inspector + bag updates.
+   */
+  onAnyEvent((name, detail = {}) => {
+    if (
+      name === 'elan:cart-updated' &&
+      typeof detail.itemCount === 'number'
+    ) {
+      setBagCount(
+        detail.itemCount,
+      )
     }
-    if (name === 'elan:order-completed') setBagCount(0)
+
+    if (
+      name === 'elan:order-completed'
+    ) {
+      setBagCount(0)
+    }
 
     seen += 1
-    counter.textContent = String(seen)
 
-    const entry = document.createElement('li')
-    entry.innerHTML = `<code>${name}</code><span>${escapeHtml(summarize(detail))}</span>`
-    list.querySelector('.elan-shell-inspector__empty')?.remove()
+    counter.textContent =
+      String(seen)
+
+    const entry =
+      document.createElement('li')
+
+    entry.innerHTML = `
+      <code>
+        ${escapeHtml(name)}
+      </code>
+
+      <span>
+        ${escapeHtml(summarize(detail))}
+      </span>
+    `
+
+    list
+      .querySelector(
+        '.elan-shell-inspector__empty',
+      )
+      ?.remove()
+
     list.prepend(entry)
-    while (list.children.length > 40) list.lastElementChild.remove()
+
+    while (
+      list.children.length > 40
+    ) {
+      list.lastElementChild.remove()
+    }
   })
+
+  /**
+   * Initial active-state sync.
+   */
+  syncNav()
 }
 
 function summarize(detail) {
-  const copy = { ...detail }
+  const copy = {
+    ...detail,
+  }
+
   delete copy.source
-  const text = JSON.stringify(copy)
-  return text.length > 120 ? `${text.slice(0, 117)}…` : text
+
+  const text =
+    JSON.stringify(copy)
+
+  return text.length > 120
+    ? `${text.slice(0, 117)}…`
+    : text
 }
 
 function escapeHtml(value) {
-  return value.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
+  return String(value).replace(
+    /[&<>"']/g,
+    (character) =>
+      `&#${character.charCodeAt(0)};`,
+  )
 }
 
-/** Keeps the control for the mounted microfrontend highlighted. */
+/**
+ * Synchronize shared header active state.
+ *
+ * Wishlist belongs technically to Account MFE, but visually Heart should be
+ * active instead of the Account/person icon.
+ */
 export function syncNav() {
-  const active = document.body.dataset.activeApp
-  for (const node of document.querySelectorAll('[data-nav]')) {
-    node.classList.toggle('is-active', node.dataset.nav === active)
+  const active =
+    document.body.dataset.activeApp
+
+  const rawPath =
+    document.body.dataset.appPath ||
+    window.location.pathname
+
+  let path =
+    rawPath
+
+  try {
+    path =
+      decodeURIComponent(rawPath)
+  } catch {
+    path =
+      rawPath
   }
 
-  // Within Catalog, highlight the category actually being browsed. Two URL
-  // shapes mean the same thing: the shell links to /category/Men, and Catalog
-  // reports its own view back as /catalog?category=Men once it has navigated.
-  const current =
-    decodeURIComponent(location.pathname).match(/\/category\/([^/?]+)/)?.[1] ??
-    new URLSearchParams(location.search).get('category')
+  const pathname =
+    path.split('?')[0]
 
-  for (const link of document.querySelectorAll('[data-category]')) {
-    link.classList.toggle('is-current', link.dataset.category === current)
+  /**
+   * Wishlist may be represented as either route depending on the route contract.
+   */
+  const isWishlist =
+    pathname === '/wishlist' ||
+    pathname === '/account/wishlist'
+
+  /**
+   * Cart routes.
+   */
+  const isCart =
+    active === 'cart' ||
+    pathname === '/cart' ||
+    pathname.startsWith('/checkout') ||
+    pathname.startsWith('/order-confirmation')
+
+  /**
+   * Account is active for Account pages EXCEPT Wishlist.
+   */
+  const isAccount =
+    active === 'account' &&
+    !isWishlist
+
+  for (
+    const node of
+    document.querySelectorAll(
+      '[data-nav]',
+    )
+  ) {
+    const nav =
+      node.dataset.nav
+
+    let shouldBeActive =
+      false
+
+    if (
+      nav === 'wishlist'
+    ) {
+      shouldBeActive =
+        isWishlist
+    }
+
+    if (
+      nav === 'account'
+    ) {
+      shouldBeActive =
+        isAccount
+    }
+
+    if (
+      nav === 'cart'
+    ) {
+      shouldBeActive =
+        isCart
+    }
+
+    node.classList.toggle(
+      'is-active',
+      shouldBeActive,
+    )
+
+    if (
+      shouldBeActive
+    ) {
+      node.setAttribute(
+        'aria-current',
+        'page',
+      )
+    } else {
+      node.removeAttribute(
+        'aria-current',
+      )
+    }
+  }
+
+  /**
+   * Search belongs ONLY to Catalog.
+   */
+  const searchToggle =
+    document.querySelector(
+      '[data-search-toggle]',
+    )
+
+  const searchBar =
+    document.querySelector(
+      '[data-search]',
+    )
+
+  const searchInput =
+    searchBar?.querySelector(
+      'input',
+    )
+
+  const catalogActive =
+    active === 'catalog'
+
+  if (
+    searchToggle
+  ) {
+    searchToggle.hidden =
+      !catalogActive
+  }
+
+  if (
+    !catalogActive &&
+    searchBar
+  ) {
+    searchBar.hidden =
+      true
+
+    searchToggle?.setAttribute(
+      'aria-expanded',
+      'false',
+    )
+
+    if (
+      searchInput
+    ) {
+      searchInput.value =
+        ''
+    }
+  }
+
+  /**
+   * Category highlighting.
+   *
+   * Supports:
+   *
+   * /category/Men
+   *
+   * and:
+   *
+   * /catalog?category=Men
+   */
+  const categoryMatch =
+    pathname.match(
+      /\/category\/([^/?]+)/,
+    )
+
+  let currentCategory =
+    categoryMatch?.[1] ??
+    null
+
+  if (
+    !currentCategory
+  ) {
+    try {
+      currentCategory =
+        new URLSearchParams(
+          path.includes('?')
+            ? path.slice(
+                path.indexOf('?'),
+              )
+            : window.location.search,
+        ).get('category')
+    } catch {
+      currentCategory =
+        null
+    }
+  }
+
+  for (
+    const link of
+    document.querySelectorAll(
+      '[data-category]',
+    )
+  ) {
+    link.classList.toggle(
+      'is-current',
+      catalogActive &&
+        link.dataset.category ===
+          currentCategory,
+    )
   }
 }
