@@ -1,10 +1,14 @@
 # ELAN — Shell Application
 
-Integration-only shell for the Fashion & Apparel marketplace (Group 1). It loads
-three independently deployed microfrontends, written in three different
-frameworks, into one experience using **Web Components**.
+Integration-only shell for the **ELAN Fashion & Apparel Marketplace (Group 1)**.
 
-**Live shell:** https://sara-qadi.github.io/fashion-elan-shell/
+The project integrates three independently developed and deployed microfrontends into one unified storefront experience using **Web Components** and **Browser Custom Events**.
+
+The Shell is responsible only for integration, routing, shared UI, and communication between the microfrontends. It does not contain the business logic of Catalog, Cart, or Account.
+
+## Live Shell
+
+https://sara-qadi.github.io/fashion-elan-shell/
 
 ## The three microfrontends
 
@@ -14,119 +18,210 @@ frameworks, into one experience using **Web Components**.
 | Cart & Checkout | Sara Qadi | Vue 3 + Vuetify | `<elan-cart-app>` | [live](https://sara-qadi.github.io/fashion-elan-card-checkout/) | [repo](https://github.com/Sara-Qadi/fashion-elan-card-checkout) |
 | Account & Orders | Mais Arman | Lit + Material Web | `<elan-account-app>` | [live](https://fashion-elan-account-orders.vercel.app/) | [repo](https://github.com/mais-arman/fashion-elan-account-orders) |
 
-The shell contains **no copy** of any of them. Each bundle is fetched at runtime
-from that member's own deployment, which is what the assignment requires.
+Each microfrontend is maintained in its own repository and deployed independently.
 
-## Integration status
+The Shell contains **no copy of the source code** of the three applications. Their deployed Web Component bundles are loaded at runtime.
 
-All three microfrontends load into the shell and the full journey works
-end to end: browse a category → open a product → add to bag → cart →
-shipping → payment → review → place order.
+---
 
-| Part | Element bundle | In the shell |
-|---|---|---|
-| Cart & Checkout | ✅ `/elan-cart-app.js` | Working |
-| Account & Orders | ✅ `/mfe/elan-account.js` | Working |
-| Catalog & Discovery | ⚠️ built, but Vercel publishes `dist/` while the element goes to `dist-element/` | Working, loaded from jsDelivr off the committed build |
+# What the Shell Does
 
-Remaining work sits in the two member repos, not here. Both briefs are written
-to be handed straight to a coding AI:
+The Shell acts as the integration layer of the ELAN application.
 
-- [`docs/PROMPT-catalog-react.md`](docs/PROMPT-catalog-react.md) — publish the
-  element from `dist/`, accept an `embedded` prop, drop two `alert()` calls
-- [`docs/PROMPT-account-lit.md`](docs/PROMPT-account-lit.md) — move the icon font
-  out of a 17MB stylesheet, and decide what happens to guest orders
+Its responsibilities include:
 
-The shell degrades honestly: a microfrontend that cannot be loaded shows what
-was requested and what failed, and the other two keep working.
+- Loading the three independently deployed microfrontends.
+- Determining which microfrontend owns the current route.
+- Managing the browser URL and navigation.
+- Synchronizing routes with the mounted Web Components.
+- Keeping required microfrontends mounted so they can continue listening for cross-app events.
+- Providing one shared ELAN header and footer.
+- Providing shared category navigation.
+- Providing the shared search entry point.
+- Displaying and synchronizing the shopping bag count.
+- Providing an Event Bus Inspector for demonstrating communication between the applications.
+- Coordinating communication using Browser `CustomEvent`s.
 
-## The shared chrome
+The Shell contains **integration logic only**. Business logic remains inside the individual microfrontends.
 
-The shell renders **one** header, category nav and footer for all three apps —
-the Catalog storefront design, since that was the strongest of the three. Each
-microfrontend suppresses its own while embedded, so the composed page has one of
-each rather than three.
+---
 
-- Cart is told `embedded` and drops its header and footer itself.
-- Catalog's are hidden by the shell's CSS until it accepts the same flag.
-- Account renders no site chrome of its own; its sidebar is page-level nav.
+# Integration Method
 
-## Run it
+The ELAN project uses:
 
-```bash
-npm install
-npm run dev      # http://localhost:5180
+**Web Components + Browser Custom Events + Integration Shell**
+
+## Why We Chose This Method
+
+The three microfrontends use different frameworks:
+
+- **Catalog & Discovery:** React
+- **Cart & Checkout:** Vue
+- **Account & Orders:** Lit
+
+Because the applications use different frameworks, we needed a framework-independent integration method.
+
+**Web Components** provide a common browser-native boundary that allows React, Vue, and Lit applications to be loaded inside the same Shell.
+
+The Shell does not need to understand the internal implementation of each framework. It only needs to know:
+
+1. The deployed bundle URL.
+2. The custom element tag.
+3. The routes owned by the microfrontend.
+4. The events used for communication.
+
+**Browser Custom Events** are used for communication because they allow the microfrontends to exchange information without importing code from one another or depending on a shared framework-specific store.
+
+This keeps the microfrontends **independently developed, independently deployed, and loosely coupled**.
+
+---
+
+# Routing Strategy
+
+One of the main architectural rules of ELAN is:
+
+> **The Shell owns the browser URL.**
+
+The three microfrontends do not independently control browser history while embedded inside the Shell.
+
+When a microfrontend wants to navigate, it emits:
+
+```text
+elan:navigate
 ```
 
-Dev still loads the **live** bundles, so you can develop the shell without
-running anyone else's project locally.
+Example payload:
 
-```bash
-npm run build    # dist/ + 404.html for the SPA fallback
-npm run preview
+```json
+{
+  "path": "/account/orders",
+  "replace": false
+}
 ```
 
-## How it works
+The Shell receives the event, updates the browser URL, determines which microfrontend owns the destination, and synchronizes the route with the appropriate Web Component.
 
-Two rules, explained in full in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md):
+This prevents the React, Vue, and Lit applications from competing over browser `history` and `popstate`.
 
-1. **The shell owns the URL.** Each app runs an in-memory router while embedded
-   and is told where it is via a `route` property. When it navigates internally
-   it emits `elan:navigate`, and the shell writes the address bar. Three history
-   routers in one page would fight over `popstate`.
-2. **Events are the only shared state.** No shared store, no backend, no
-   cross-app imports — just `CustomEvent`s on `window` with `bubbles: true` and
-   `composed: true`. The one exception is the completed-order snapshot, which
-   goes through same-origin `localStorage` precisely *because* customer data
-   must not travel on the bus.
-3. **Elements are hidden, never destroyed.** Cart has to hear
-   `elan:add-to-cart` while the shopper is on a Catalog page, and Account has to
-   hear `elan:order-completed` on the Cart's confirmation route. An unmounted
-   app hears nothing, so every app stays on the page once loaded.
+---
 
-## Source map
+# Source Map
 
 | File | Responsibility |
 |---|---|
-| `src/registry.js` | The three microfrontends: URL, tag, owned routes. The whole contract in one table |
-| `src/loader.js` | Fetches a bundle from its live URL; stable filename first, index.html discovery as fallback |
-| `src/router.js` | Owns `history`, decides which element is *visible*; mounted elements are never destroyed |
-| `src/bus.js` | Listens to every `elan:*` event, translates the names the three contracts disagreed on |
-| `src/chrome.js` | Shared header, category nav, search, footer, bag badge, event inspector |
-| `src/styles.js` | Declares icon `@font-face`s a shadow root cannot provide for itself |
-| `src/basePath.js` | Translates between browser paths (`/fashion-elan-shell/cart`) and app paths (`/cart`) |
+| `src/registry.js` | Defines the three microfrontends, their deployed bundle information, custom element tags, owned routes, and integration behavior |
+| `src/loader.js` | Loads the deployed Web Component bundles |
+| `src/router.js` | Owns browser history, determines the active microfrontend, and synchronizes routes |
+| `src/bus.js` | Observes and coordinates `elan:*` Browser Custom Events |
+| `src/chrome.js` | Provides the shared header, category navigation, search, bag badge, footer, and Event Inspector |
+| `src/styles.js` | Handles document-level icon font requirements |
+| `src/basePath.js` | Converts between GitHub Pages browser paths and internal application routes |
 
-## Event inspector
+---
 
-The floating **Events** button opens a live log of everything crossing the bus.
-It is the fastest way to show, in a demo, that three separate applications are
-actually talking to each other.
+# Run Locally
 
-## Deployment
+Install dependencies:
 
-GitHub Actions publishes to GitHub Pages on every push to `main`
-(`.github/workflows/deploy.yml`). Because Pages serves from `/<repo>/` and has
-no rewrite rules, two things adapt:
+```bash
+npm install
+```
 
-- `vite.config.js` sets `base` to `/fashion-elan-shell/` in production, and
-  `src/basePath.js` keeps the router working under that prefix
-- `scripts/spa-fallback.mjs` copies `index.html` to `404.html`, so a hard
-  refresh on `/cart` still reaches the shell router
+Start the development server:
 
-For a root deploy (Vercel/Netlify), build with `VITE_BASE=/`.
+```bash
+npm run dev
+```
 
-## Known issues
+Local development URL:
 
-- **Deep-link refresh returns HTTP 404** while rendering correctly. That is
-  inherent to the GitHub Pages fallback; a host with real rewrites returns 200.
-- **Catalog is served from jsDelivr**, which reflects the last *commit* rather
-  than the last deploy and caches for hours. Temporary — see the brief.
-- **Guest orders never reach order history.** Account requires a signed-in user
-  before it will file one. Sign in before checking out when demoing.
-- **Light-DOM apps share one stylesheet namespace.** The shell's CSS is scoped
-  to `.elan-*`, but Vuetify's reset ships inside the Cart bundle and lands on
-  the document — `html { overflow-x: hidden }` from it silently broke
-  `position: sticky` on the header until the shell took `body` overflow back.
-- **The discovery fallback is fragile by design.** It parses `index.html` to
-  find a hashed entry. It exists so integration works before everyone has added
-  a stable filename — not as the long-term contract.
+```text
+http://localhost:5180
+```
+
+The Shell loads the deployed microfrontend bundles, so the three member applications do not all need to be running locally.
+
+---
+
+# Production Build
+
+Build the Shell:
+
+```bash
+npm run build
+```
+
+Preview the production build:
+
+```bash
+npm run preview
+```
+
+---
+
+# Deployment
+
+The ELAN Integration Shell is deployed using **GitHub Pages**.
+
+Live URL:
+
+https://sara-qadi.github.io/fashion-elan-shell/
+
+GitHub Actions publishes the Shell through the configured deployment workflow.
+
+Because GitHub Pages serves the application from:
+
+```text
+/fashion-elan-shell/
+```
+
+instead of the domain root, the Shell uses `basePath.js` to translate between browser paths and internal application routes.
+
+For example:
+
+```text
+Browser URL:
+/fashion-elan-shell/account/orders
+
+Internal application route:
+/account/orders
+```
+
+The Vite production base path is configured accordingly.
+
+The project also provides an SPA fallback so direct navigation and hard refreshes can still reach the Shell router when hosted on GitHub Pages.
+
+---
+# Integration Status
+
+| Feature | Status |
+|---|---|
+| Catalog & Discovery integration | ✅ Working |
+| Cart & Checkout integration | ✅ Working |
+| Account & Orders integration | ✅ Working |
+| Shared Shell routing | ✅ Working |
+| Cross-MFE Add to Cart | ✅ Working |
+| Cart badge synchronization | ✅ Working |
+| Account internal navigation without refresh | ✅ Working |
+| Catalog → Account Wishlist synchronization | ✅ Working |
+| Wishlist header active state | ✅ Working |
+| Shared header and footer | ✅ Working |
+| Event Inspector | ✅ Working |
+
+---
+
+# Final Result
+
+ELAN demonstrates a microfrontend architecture in which:
+
+- Three different frontend frameworks coexist inside one application.
+- Each microfrontend is developed independently.
+- Each microfrontend is deployed independently.
+- The Shell contains integration logic rather than application business logic.
+- The Shell owns browser navigation.
+- Cross-application communication uses Browser Custom Events.
+- Shared UI reacts to events without directly accessing another microfrontend's internal state.
+- Catalog, Cart, and Account communicate while remaining loosely coupled.
+
+The final result is one unified **ELAN Fashion & Apparel Marketplace** composed from **React, Vue, and Lit microfrontends** while preserving independent development and deployment.
